@@ -1,0 +1,1570 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes" />
+    <title>سبايكي - حجز موعد</title>
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        body {
+            background: #f5f0eb;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 16px;
+        }
+        .app-container {
+            max-width: 480px;
+            width: 100%;
+            background: #fff;
+            border-radius: 32px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.12);
+            padding: 24px 20px 32px;
+            position: relative;
+            overflow: hidden;
+        }
+        .app-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 24px;
+            padding-bottom: 12px;
+            border-bottom: 2px solid #f0e8e0;
+        }
+        .app-header h1 { font-size: 22px; font-weight: 700; color: #2d1b12; cursor: default; user-select: none; }
+        .app-header h1 span { color: #c89a7b; }
+        .header-actions button {
+            background: none; border: none; font-size: 20px; cursor: pointer;
+            padding: 6px 10px; border-radius: 12px; color: #5a3d2e;
+        }
+        .header-actions button:hover { background: #f0e8e0; }
+        .view { display: none; animation: fadeSlide 0.35s ease; }
+        .view.active { display: block; }
+        @keyframes fadeSlide {
+            0% { opacity: 0; transform: translateY(16px); }
+            100% { opacity: 1; transform: translateY(0); }
+        }
+        .form-group { margin-bottom: 18px; }
+        .form-group label { display: block; font-size: 14px; font-weight: 600; color: #3d2a1e; margin-bottom: 6px; }
+        .form-group input, .form-group textarea {
+            width: 100%; padding: 14px 16px; border: 2px solid #e8ddd5; border-radius: 16px;
+            font-size: 16px; background: #fcf9f7; transition: border 0.25s, box-shadow 0.25s;
+            color: #2d1b12; outline: none;
+        }
+        .form-group input:focus, .form-group textarea:focus {
+            border-color: #c89a7b; box-shadow: 0 0 0 4px rgba(200, 154, 123, 0.15); background: #fff;
+        }
+        .form-group textarea { resize: vertical; min-height: 70px; }
+        .btn {
+            display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+            padding: 14px 28px; border: none; border-radius: 16px; font-size: 16px; font-weight: 600;
+            cursor: pointer; transition: all 0.25s ease; width: 100%; color: #fff; background: #2d1b12;
+        }
+        .btn:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(45, 27, 18, 0.25); }
+        .btn:active { transform: scale(0.97); }
+        .btn-primary { background: #2d1b12; }
+        .btn-secondary { background: #c89a7b; }
+        .btn-secondary:hover { background: #b88869; }
+        .btn-danger { background: #d95c5c; }
+        .btn-danger:hover { background: #c44a4a; }
+        .btn-success { background: #4a9e6b; }
+        .btn-success:hover { background: #3d8859; }
+        .btn-outline { background: transparent; color: #2d1b12; border: 2px solid #ddd0c6; }
+        .btn-outline:hover { background: #f5f0eb; transform: none; box-shadow: none; }
+        .btn-sm { padding: 10px 18px; font-size: 14px; width: auto; }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none !important; }
+        .toast-container {
+            position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+            z-index: 9999; width: 90%; max-width: 440px;
+        }
+        .toast {
+            background: #2d1b12; color: #fff; padding: 16px 20px; border-radius: 16px;
+            font-size: 15px; font-weight: 500; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+            display: flex; align-items: center; gap: 12px; margin-bottom: 8px; animation: toastIn 0.4s ease;
+        }
+        .toast.success { background: #4a9e6b; }
+        .toast.error { background: #d95c5c; }
+        .toast.warning { background: #d9a84a; }
+        @keyframes toastIn {
+            0% { opacity: 0; transform: translateY(30px); }
+            100% { opacity: 1; transform: translateY(0); }
+        }
+        .toast .close-toast {
+            background: none; border: none; color: rgba(255, 255, 255, 0.7); font-size: 20px;
+            cursor: pointer; margin-right: auto; padding: 0 4px;
+        }
+        .booking-card {
+            background: #fcf9f7; border-radius: 20px; padding: 18px 20px;
+            margin-bottom: 14px; border: 2px solid #f0e8e0;
+        }
+        .booking-card .top-row { display: flex; justify-content: space-between; align-items: start; flex-wrap: wrap; gap: 8px; }
+        .booking-card .customer-name { font-size: 18px; font-weight: 700; color: #2d1b12; }
+        .booking-card .booking-date {
+            font-size: 14px; color: #7a6050; background: #f0e8e0; padding: 4px 14px; border-radius: 20px;
+        }
+        .booking-card .booking-time { font-size: 14px; color: #c89a7b; font-weight: 600; }
+        .booking-card .booking-phone { font-size: 13px; color: #7a6050; margin-top: 4px; }
+        .booking-card .booking-notes {
+            font-size: 13px; color: #7a6050; margin-top: 6px; padding-top: 6px;
+            border-top: 1px dashed #e8ddd5; word-break: break-word;
+        }
+        .booking-card .actions { margin-top: 12px; display: flex; gap: 8px; flex-wrap: wrap; }
+        .booking-card .actions .btn { flex: 0 0 auto; width: auto; padding: 8px 18px; font-size: 13px; }
+        .admin-overlay {
+            display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0, 0, 0, 0.6); z-index: 999; justify-content: center; align-items: center;
+            padding: 20px; backdrop-filter: blur(4px);
+        }
+        .admin-overlay.show { display: flex; }
+        .admin-panel {
+            background: #fff; border-radius: 32px; max-width: 500px; width: 100%;
+            max-height: 90vh; padding: 24px 20px; overflow-y: auto; position: relative;
+        }
+        .admin-panel .close-admin {
+            position: absolute; top: 12px; left: 16px; background: none; border: none;
+            font-size: 28px; cursor: pointer; color: #7a6050;
+        }
+        .admin-panel .admin-title { font-size: 20px; font-weight: 700; color: #2d1b12; margin-bottom: 16px; }
+        .admin-panel .stats-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 20px; }
+        .admin-panel .stat-box {
+            background: #fcf9f7; border-radius: 16px; padding: 14px 10px; text-align: center; border: 2px solid #f0e8e0;
+        }
+        .admin-panel .stat-box .number { font-size: 26px; font-weight: 700; color: #2d1b12; display: block; }
+        .admin-panel .stat-box .label { font-size: 12px; color: #7a6050; margin-top: 2px; }
+        .admin-panel .stat-box.highlight { border-color: #c89a7b; background: #fcf6f0; }
+        .admin-panel .settings-row {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 14px 0; border-bottom: 1px solid #f0e8e0; flex-wrap: wrap; gap: 8px;
+        }
+        .admin-panel .settings-row .info .title { font-weight: 600; color: #2d1b12; font-size: 15px; }
+        .admin-panel .settings-row .info .desc { font-size: 13px; color: #7a6050; }
+        .admin-panel .toggle {
+            position: relative; width: 50px; height: 28px; background: #ddd0c6;
+            border-radius: 30px; cursor: pointer; transition: background 0.3s; flex-shrink: 0;
+        }
+        .admin-panel .toggle.active { background: #c89a7b; }
+        .admin-panel .toggle .knob {
+            position: absolute; top: 3px; right: 3px; width: 22px; height: 22px;
+            background: #fff; border-radius: 50%; transition: transform 0.3s; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+        }
+        .admin-panel .toggle.active .knob { transform: translateX(-22px); }
+        .admin-panel .phone-prefix {
+            display: flex; align-items: center; background: #fcf9f7; border: 2px solid #e8ddd5;
+            border-radius: 16px; overflow: hidden; flex: 1; max-width: 200px;
+        }
+        .admin-panel .phone-prefix .prefix {
+            padding: 8px 8px 8px 4px; font-weight: 600; color: #2d1b12; font-size: 14px;
+            background: #f5f0eb; border-left: 2px solid #e8ddd5; white-space: nowrap;
+        }
+        .admin-panel .phone-prefix input {
+            border: none !important; border-radius: 0 !important; background: transparent !important;
+            padding: 8px 10px !important; flex: 1; box-shadow: none !important; font-size: 14px;
+        }
+        .admin-panel .phone-prefix input:focus { box-shadow: none !important; }
+        .admin-panel .user-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 12px; }
+        .admin-panel .user-table th { background: #f0e8e0; padding: 8px 6px; text-align: right; font-weight: 600; color: #2d1b12; }
+        .admin-panel .user-table td { padding: 8px 6px; border-bottom: 1px solid #f0e8e0; vertical-align: middle; }
+        .admin-panel .user-table .phone-col { direction: ltr; text-align: left; }
+        .admin-panel .tabs { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+        .admin-panel .tabs .btn { flex: 1; width: auto; font-size: 14px; padding: 10px 12px; }
+        .admin-panel .tab-content { display: none; }
+        .admin-panel .tab-content.active { display: block; }
+        .admin-panel .scroll-area { max-height: 50vh; overflow-y: auto; }
+        .badge { display: inline-block; padding: 2px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; }
+        .badge.active { background: #e8f5e9; color: #2e7d32; }
+        .badge.cancelled { background: #fce4ec; color: #c62828; }
+        .badge.completed { background: #e3f2fd; color: #0d47a1; }
+        .admin-panel .empty-state { text-align: center; padding: 40px 20px; color: #7a6050; }
+        .admin-panel .empty-state .emoji { font-size: 48px; margin-bottom: 12px; }
+        .admin-panel .empty-state h3 { color: #2d1b12; margin-bottom: 6px; }
+        .text-muted { color: #7a6050; font-size: 14px; }
+        .text-center { text-align: center; }
+        .mt-8 { margin-top: 8px; }
+        .mt-16 { margin-top: 16px; }
+        .mb-8 { margin-bottom: 8px; }
+        .mb-16 { margin-bottom: 16px; }
+        .phone-prefix {
+            display: flex; align-items: center; background: #fcf9f7; border: 2px solid #e8ddd5;
+            border-radius: 16px; overflow: hidden; transition: border 0.25s, box-shadow 0.25s;
+        }
+        .phone-prefix:focus-within { border-color: #c89a7b; box-shadow: 0 0 0 4px rgba(200, 154, 123, 0.15); }
+        .phone-prefix .prefix {
+            padding: 14px 12px 14px 4px; font-weight: 600; color: #2d1b12; font-size: 16px;
+            background: #f5f0eb; border-left: 2px solid #e8ddd5; white-space: nowrap;
+        }
+        .phone-prefix input {
+            border: none !important; border-radius: 0 !important; background: transparent !important;
+            padding: 14px 16px !important; flex: 1; box-shadow: none !important;
+        }
+        .phone-prefix input:focus { box-shadow: none !important; }
+        .spinner {
+            display: inline-block; width: 20px; height: 20px; border: 3px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%; border-top-color: #fff; animation: spin 0.7s ease infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .btn .spinner { width: 18px; height: 18px; border-width: 2px; }
+        .admin-trigger { text-align: center; margin-top: 20px; font-size: 12px; color: #ddd0c6; cursor: default; user-select: none; }
+
+        /* Day picker */
+        .day-picker {
+            display: flex; gap: 8px; overflow-x: auto; padding: 4px 2px 8px;
+            -webkit-overflow-scrolling: touch;
+        }
+        .day-chip {
+            flex: 0 0 auto; min-width: 56px; display: flex; flex-direction: column; align-items: center;
+            gap: 2px; padding: 10px 6px; border-radius: 16px; border: 2px solid #e8ddd5;
+            background: #fcf9f7; cursor: pointer; font-family: inherit; transition: all 0.2s;
+        }
+        .day-chip .day-chip-weekday { font-size: 12px; color: #7a6050; font-weight: 600; }
+        .day-chip .day-chip-num { font-size: 18px; color: #2d1b12; font-weight: 700; }
+        .day-chip.selected { border-color: #c89a7b; background: #c89a7b; }
+        .day-chip.selected .day-chip-weekday, .day-chip.selected .day-chip-num { color: #fff; }
+        .day-chip.disabled { opacity: 0.4; cursor: not-allowed; }
+        .day-chip:disabled { opacity: 0.4; cursor: not-allowed; }
+
+        /* Weekday multi-toggle (closed days) */
+        .weekday-toggles { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+        .weekday-chip {
+            padding: 8px 12px; border-radius: 14px; border: 2px solid #e8ddd5; background: #fcf9f7;
+            font-size: 13px; font-weight: 600; color: #3d2a1e; cursor: pointer; font-family: inherit;
+        }
+        .weekday-chip.active { background: #d95c5c; border-color: #d95c5c; color: #fff; }
+
+        .hint-note { font-size: 12px; color: #a08a78; margin-top: 4px; }
+        .inline-reset { display: flex; gap: 4px; align-items: center; flex-wrap: wrap; }
+        .inline-reset input {
+            width: 90px; padding: 6px 8px; border: 2px solid #e8ddd5; border-radius: 8px; font-size: 12px;
+        }
+        .inline-reset .btn { padding: 6px 10px; font-size: 12px; width: auto; }
+    </style>
+</head>
+<body>
+
+    <!-- ===== TOAST CONTAINER ===== -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <!-- ===== APP ===== -->
+    <div class="app-container" id="app">
+
+        <!-- HEADER -->
+        <div class="app-header">
+            <h1 id="appTitle">✂️ <span>Spaiky</span></h1>
+            <div class="header-actions">
+                <button id="btnLogout" title="تسجيل خروج" onclick="logout()" style="display:none;">🚪</button>
+            </div>
+        </div>
+
+        <!-- ===== CUSTOMER LOGIN / SIGNUP ===== -->
+        <div class="view active" id="viewCustomerLogin">
+            <div style="text-align:center; margin-bottom:20px;">
+                <div style="font-size:40px; margin-bottom:4px;">👤</div>
+                <h2 style="color:#2d1b12; font-size:20px;" id="customerLoginTitle">تسجيل الدخول</h2>
+                <p class="text-muted" style="font-size:13px;" id="customerLoginSub">أدخل رقم هاتفك</p>
+            </div>
+
+            <div class="form-group">
+                <label>رقم الهاتف 📱</label>
+                <div class="phone-prefix">
+                    <span class="prefix">🇪🇬 +20</span>
+                    <input type="tel" id="customerPhone" placeholder="مثال: 1001234567" maxlength="10" inputmode="numeric" />
+                </div>
+            </div>
+
+            <div class="form-group" id="customerNameGroup" style="display:none;">
+                <label>الاسم الكامل 👤</label>
+                <input type="text" id="customerName" placeholder="أدخل اسمك" maxlength="60" />
+            </div>
+
+            <div class="form-group" id="customerPasswordGroup">
+                <label>الرقم السري 🔑</label>
+                <input type="password" id="customerPassword" placeholder="أدخل الرقم السري" maxlength="64" />
+            </div>
+
+            <div class="form-group" id="customerConfirmGroup" style="display:none;">
+                <label>تأكيد الرقم السري</label>
+                <input type="password" id="customerConfirmPassword" placeholder="أعد إدخال الرقم السري" maxlength="64" />
+            </div>
+
+            <div class="text-center mt-8" id="forgotPasswordLink">
+                <a href="#" onclick="showForgotPassword(); return false;" style="color:#c89a7b; text-decoration:none; font-size:14px;">نسيت الرقم السري؟</a>
+            </div>
+
+            <button class="btn btn-primary" id="btnCustomerLogin" onclick="handleCustomerLogin()">
+                <span id="btnCustomerLoginText">تسجيل الدخول</span>
+            </button>
+
+            <div style="margin-top:16px; text-align:center;">
+                <span class="text-muted" style="font-size:13px;" id="toggleLoginSignupText">ليس لديك حساب؟</span>
+                <button class="btn btn-outline btn-sm" onclick="toggleCustomerLoginMode()" style="font-size:13px; width:auto; padding:6px 18px;" id="toggleLoginSignupBtn">إنشاء حساب جديد</button>
+            </div>
+        </div>
+
+        <!-- ===== FORGOT PASSWORD ===== -->
+        <div class="view" id="viewForgotPassword">
+            <div style="text-align:center; margin-bottom:20px;">
+                <div style="font-size:40px;">🔑</div>
+                <h2 style="color:#2d1b12; font-size:20px;">نسيت الرقم السري؟</h2>
+                <p class="text-muted" style="font-size:14px;">للحصول على مساعدة، يرجى التواصل مع:</p>
+                <div style="font-size:24px; font-weight:700; color:#c89a7b; margin-top:8px;" id="forgotContactDisplay">+20 100 000 0000</div>
+                <p class="text-muted" style="font-size:13px; margin-top:8px;">وسيقوم فريق الدعم بمساعدتك.</p>
+            </div>
+            <button class="btn btn-outline" onclick="showCustomerLogin()">↩️ العودة لتسجيل الدخول</button>
+        </div>
+
+        <!-- ===== CUSTOMER DASHBOARD ===== -->
+        <div class="view" id="viewCustomerDashboard">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; flex-wrap:wrap; gap:8px;">
+                <div>
+                    <div style="font-size:20px; font-weight:700; color:#2d1b12;" id="customerNameDisplay">👤</div>
+                    <div class="text-muted" style="font-size:13px;" id="customerPhoneDisplay"></div>
+                </div>
+                <button class="btn btn-outline btn-sm" onclick="viewMyBookings()" style="width:auto; padding:6px 16px;">📋 حجوزاتي</button>
+            </div>
+
+            <div style="background:#fcf9f7; border-radius:20px; padding:18px 16px; border:2px solid #f0e8e0;">
+                <h3 style="font-size:17px; color:#2d1b12; margin-bottom:14px;">✏️ حجز موعد جديد</h3>
+
+                <div class="form-group">
+                    <label>الاسم الكامل 👤</label>
+                    <input type="text" id="bookingName" placeholder="أدخل اسمك" maxlength="60" />
+                </div>
+
+                <div class="form-group">
+                    <label>📅 اختر اليوم <span class="label-hint">(أسبوع واحد قادم فقط)</span></label>
+                    <div class="day-picker" id="bookingDayPicker">
+                        <span class="text-muted" style="font-size:13px;">جارِ تحميل الأيام...</span>
+                    </div>
+                </div>
+
+                <div class="form-group" id="timeGroup">
+                    <label>🕐 الوقت <span class="label-hint" id="timeHint">(اختياري)</span></label>
+                    <input type="time" id="bookingTime" />
+                </div>
+
+                <div class="form-group">
+                    <label>📞 رقم هاتف إضافي <span class="label-hint">(اختياري)</span></label>
+                    <div class="phone-prefix">
+                        <span class="prefix">🇪🇬 +20</span>
+                        <input type="tel" id="bookingAltPhone" placeholder="رقم آخر" maxlength="10" inputmode="numeric" />
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>📝 ملاحظات <span class="label-hint">(اختياري)</span></label>
+                    <textarea id="bookingNotes" placeholder="أي ملاحظات إضافية..." maxlength="300"></textarea>
+                </div>
+
+                <button class="btn btn-secondary" onclick="submitBooking()" id="btnSubmitBooking">
+                    تأكيد الحجز ✅
+                </button>
+            </div>
+
+            <div id="myBookingsContainer" style="margin-top:20px; display:none;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                    <h3 style="font-size:17px; color:#2d1b12;">📋 حجوزاتي</h3>
+                    <button class="btn btn-outline btn-sm" onclick="closeMyBookings()" style="width:auto; padding:4px 14px;">✕</button>
+                </div>
+                <div id="myBookingsList" class="scroll-area"></div>
+            </div>
+
+            <div class="admin-trigger" id="adminTrigger" style="margin-top:24px;">
+                <span>—</span>
+            </div>
+        </div>
+
+        <!-- ===== ADMIN OVERLAY ===== -->
+        <div class="admin-overlay" id="adminOverlay">
+            <div class="admin-panel">
+                <button class="close-admin" onclick="closeAdminPanel()">✕</button>
+                <div class="admin-title">👑 لوحة الإدارة</div>
+
+                <div class="stats-row">
+                    <div class="stat-box highlight">
+                        <span class="number" id="statTodayBookings">0</span>
+                        <span class="label">حجوزات اليوم المحدد</span>
+                    </div>
+                    <div class="stat-box">
+                        <span class="number" id="statDailyLimit">—</span>
+                        <span class="label">الحد الأقصى</span>
+                    </div>
+                    <div class="stat-box">
+                        <span class="number" id="statRemaining">—</span>
+                        <span class="label">المتبقي</span>
+                    </div>
+                </div>
+
+                <div class="tabs">
+                    <button class="btn btn-sm btn-secondary" onclick="switchAdminTab('bookings')" id="tabBookingsBtn" style="flex:1;">📋 الحجوزات</button>
+                    <button class="btn btn-sm btn-outline" onclick="switchAdminTab('users')" id="tabUsersBtn" style="flex:1;">👥 العملاء</button>
+                    <button class="btn btn-sm btn-outline" onclick="switchAdminTab('settings')" id="tabSettingsBtn" style="flex:1;">⚙️ الإعدادات</button>
+                    <button class="btn btn-sm btn-outline" onclick="switchAdminTab('bookForCustomer')" id="tabBookCustomerBtn" style="flex:1;">📞 حجز</button>
+                </div>
+
+                <div class="tab-content active" id="adminTabBookings">
+                    <div class="form-group" style="margin-bottom:12px;">
+                        <label style="font-size:13px;">📅 اختر اليوم لعرض حجوزاته</label>
+                        <select id="adminBookingDateSelect" style="width:100%; padding:10px 12px; border:2px solid #e8ddd5; border-radius:12px; font-size:14px;" onchange="onAdminDateSelectChange()"></select>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:8px;">
+                        <span class="text-muted" style="font-size:14px;">قائمة الحجوزات</span>
+                        <button class="btn btn-outline btn-sm" onclick="refreshAdminBookings()" style="width:auto; padding:4px 14px;">🔄 تحديث</button>
+                    </div>
+                    <div id="adminBookingsList" class="scroll-area" style="max-height:40vh;"></div>
+                </div>
+
+                <div class="tab-content" id="adminTabUsers">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:8px;">
+                        <span class="text-muted" style="font-size:14px;">قائمة العملاء</span>
+                        <button class="btn btn-outline btn-sm" onclick="refreshUsersList()" style="width:auto; padding:4px 14px;">🔄 تحديث</button>
+                    </div>
+                    <div class="scroll-area" style="max-height:45vh;">
+                        <table class="user-table" id="usersTable">
+                            <thead>
+                                <tr><th>#</th><th>الاسم</th><th>الهاتف</th><th>إجراءات</th></tr>
+                            </thead>
+                            <tbody id="usersTableBody">
+                                <tr><td colspan="4" class="text-center text-muted">لا يوجد عملاء</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="tab-content" id="adminTabSettings">
+                    <div style="background:#fcf9f7; border-radius:20px; padding:18px 16px; border:2px solid #f0e8e0;">
+                        <h4 style="font-size:16px; color:#2d1b12; margin-bottom:14px;">⚙️ الإعدادات</h4>
+
+                        <div class="settings-row">
+                            <div class="info">
+                                <span class="title">الحد الأقصى للحجوزات اليومية</span>
+                                <span class="desc">لكل يوم على حدة</span>
+                            </div>
+                            <input type="number" id="settingDailyLimit" min="1" max="100" value="10" style="width:70px; padding:8px 10px; border:2px solid #e8ddd5; border-radius:12px; font-size:16px; text-align:center;" />
+                        </div>
+
+                        <div class="settings-row" style="display:block;">
+                            <div class="info" style="margin-bottom:4px;">
+                                <span class="title">📅 الأيام المغلقة</span>
+                                <span class="desc">اختر الأيام اللي مفيش فيها حجز (مثلاً الإثنين)</span>
+                            </div>
+                            <div class="weekday-toggles" id="closedWeekdaysPicker"></div>
+                        </div>
+
+                        <div class="settings-row">
+                            <div class="info">
+                                <span class="title">تفعيل خيار تحديد الوقت</span>
+                                <span class="desc">يظهر للعميل أو يختفي</span>
+                            </div>
+                            <div class="toggle active" id="toggleTime" onclick="toggleTimeSetting()">
+                                <div class="knob"></div>
+                            </div>
+                        </div>
+
+                        <div class="settings-row">
+                            <div class="info">
+                                <span class="title">رقم التواصل لاسترجاع كلمة المرور</span>
+                                <span class="desc">يظهر للعملاء عند نسيان الرقم السري</span>
+                            </div>
+                            <div class="phone-prefix" style="flex:1; max-width:160px;">
+                                <span class="prefix">🇪🇬 +20</span>
+                                <input type="tel" id="settingContactNumber" placeholder="رقم" maxlength="10" inputmode="numeric" style="padding:8px 10px;" />
+                            </div>
+                        </div>
+
+                        <div class="settings-row" style="display:block;">
+                            <div class="info" style="margin-bottom:8px;">
+                                <span class="title">كلمة سر الأدمن</span>
+                                <span class="desc">اتركها فارغة للاحتفاظ بكلمة السر الحالية</span>
+                            </div>
+                            <input type="password" id="settingAdminPassword" placeholder="كلمة سر جديدة (اختياري)" autocomplete="new-password" style="width:100%; padding:10px 12px; border:2px solid #e8ddd5; border-radius:12px; font-size:14px;" />
+                        </div>
+
+                        <button class="btn btn-primary" onclick="saveSettings()" style="margin-top:16px;">💾 حفظ الإعدادات</button>
+                    </div>
+                </div>
+
+                <div class="tab-content" id="adminTabBookCustomer">
+                    <div style="background:#fcf9f7; border-radius:20px; padding:18px 16px; border:2px solid #f0e8e0;">
+                        <h4 style="font-size:16px; color:#2d1b12; margin-bottom:14px;">📞 حجز لعميل</h4>
+                        <div class="form-group">
+                            <label>رقم العميل 📱</label>
+                            <div class="phone-prefix">
+                                <span class="prefix">🇪🇬 +20</span>
+                                <input type="tel" id="adminBookPhone" placeholder="مثال: 1001234567" maxlength="10" inputmode="numeric" />
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>الاسم 👤</label>
+                            <input type="text" id="adminBookName" placeholder="اسم العميل" maxlength="60" />
+                        </div>
+                        <div class="form-group">
+                            <label>📅 اختر اليوم</label>
+                            <div class="day-picker" id="adminBookingDayPicker">
+                                <span class="text-muted" style="font-size:13px;">جارِ تحميل الأيام...</span>
+                            </div>
+                        </div>
+                        <div class="form-group" id="adminTimeGroup">
+                            <label>🕐 الوقت</label>
+                            <input type="time" id="adminBookTime" />
+                        </div>
+                        <div class="form-group">
+                            <label>📞 رقم إضافي</label>
+                            <div class="phone-prefix">
+                                <span class="prefix">🇪🇬 +20</span>
+                                <input type="tel" id="adminBookAltPhone" placeholder="رقم آخر" maxlength="10" inputmode="numeric" />
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>📝 ملاحظات</label>
+                            <textarea id="adminBookNotes" placeholder="ملاحظات..." maxlength="300"></textarea>
+                        </div>
+                        <button class="btn btn-success" onclick="adminBookForCustomer()">✅ حجز للعميل</button>
+                    </div>
+                </div>
+
+                <div style="margin-top:16px; text-align:center;">
+                    <button class="btn btn-outline btn-sm" onclick="closeAdminPanel()" style="width:auto; padding:6px 18px;">إغلاق</button>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // ================================================================
+        //  FIREBASE CONFIG — استبدل بالقيم الخاصة بمشروعك الحقيقي في Firebase
+        // ================================================================
+        const firebaseConfig = {
+            apiKey: "AIzaSyBvK7-7LJq5wLn8RqP0GxMQzH0n3p2WgY4",
+            authDomain: "spaiky-booking.firebaseapp.com",
+            projectId: "spaiky-booking",
+            storageBucket: "spaiky-booking.firebasestorage.app",
+            messagingSenderId: "123456789012",
+            appId: "1:123456789012:web:abcdef1234567890"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+        // ================================================================
+        //  ملاحظة أمنية: لازم تفعّل Firestore Security Rules في مشروعك بحيث
+        //  محدش غير الأدمن الحقيقي (عبر تحقق من طرف السيرفر لاحقًا) يقدر يقرأ
+        //  users أو settings/adminAuth مباشرة. راجع الشرح اللي بعتهولك قبل كده.
+        // ================================================================
+
+        // ===== STATE =====
+        let currentUser = null;
+        let isNewCustomer = false;
+        let adminClicks = 0;
+        let adminClickTimer = null;
+        const ADMIN_SALT = 'spaiky-admin-fixed-salt-v1';
+        const DEFAULT_ADMIN_PASSWORD = 'admin123';
+        const WEEKDAY_LABELS = ['أحد', 'اثنين', 'ثلاثاء', 'أربعاء', 'خميس', 'جمعة', 'سبت'];
+        const WEEKDAY_LABELS_SHORT = ['أحد', 'اثنين', 'ثلا', 'أرب', 'خميس', 'جمعة', 'سبت'];
+
+        let selectedBookingDate = null;
+        let selectedAdminBookingDate = null;
+        let adminSelectedViewDate = null;
+        let closedWeekdaysDraft = [];
+
+        const $ = (id) => document.getElementById(id);
+
+        // ================================================================
+        //  SECURITY HELPERS
+        // ================================================================
+        function escapeHtml(str) {
+            if (str === null || str === undefined) return '';
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+
+        function generateSalt() {
+            const arr = new Uint8Array(16);
+            crypto.getRandomValues(arr);
+            return Array.from(arr).map(b => b.toString(16).padStart(2, '0')).join('');
+        }
+
+        async function hashPassword(password, salt) {
+            const enc = new TextEncoder();
+            const data = enc.encode(password + ':' + salt);
+            const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+            return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+        }
+
+        function isValidEgyptianMobile(number) {
+            return /^1[0-9]{9}$/.test(number);
+        }
+
+        // ================================================================
+        //  DATE HELPERS
+        // ================================================================
+        function toDateStr(d) {
+            const y = d.getFullYear();
+            const m = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${y}-${m}-${day}`;
+        }
+
+        function getNextWeekDates() {
+            const days = [];
+            const today = new Date();
+            for (let i = 0; i < 7; i++) {
+                const d = new Date(today);
+                d.setDate(today.getDate() + i);
+                days.push({
+                    dateStr: toDateStr(d),
+                    weekdayIndex: d.getDay(),
+                    dayNum: d.getDate(),
+                    weekdayLabel: WEEKDAY_LABELS_SHORT[d.getDay()],
+                });
+            }
+            return days;
+        }
+
+        function formatDateLabel(dateStr) {
+            const days = getNextWeekDates();
+            const found = days.find(d => d.dateStr === dateStr);
+            if (!found) return dateStr;
+            const dayName = WEEKDAY_LABELS[found.weekdayIndex];
+            return `${dayName} ${found.dayNum} (${dateStr})`;
+        }
+
+        // ================================================================
+        //  TOAST
+        // ================================================================
+        function showToast(message, type = 'info', duration = 4000) {
+            const container = $('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            const icons = { success: '✅', error: '❌', warning: '⚠️', info: 'ℹ️' };
+            const iconSpan = document.createElement('span');
+            iconSpan.textContent = icons[type] || 'ℹ️';
+            const msgSpan = document.createElement('span');
+            msgSpan.style.flex = '1';
+            msgSpan.textContent = message;
+            const closeBtn = document.createElement('button');
+            closeBtn.className = 'close-toast';
+            closeBtn.textContent = '✕';
+            closeBtn.onclick = () => toast.remove();
+            toast.appendChild(iconSpan);
+            toast.appendChild(msgSpan);
+            toast.appendChild(closeBtn);
+            container.appendChild(toast);
+            setTimeout(() => { if (toast.parentElement) toast.remove(); }, duration);
+        }
+
+        // ================================================================
+        //  NAVIGATION
+        // ================================================================
+        function showView(id) {
+            document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+            $(id).classList.add('active');
+        }
+
+        function showCustomerLogin() {
+            showView('viewCustomerLogin');
+            setCustomerLoginMode(false);
+            $('customerPhone').value = '';
+            $('customerPassword').value = '';
+            $('customerName').value = '';
+            $('customerConfirmPassword').value = '';
+            $('forgotPasswordLink').style.display = 'block';
+            $('btnLogout').style.display = 'none';
+        }
+
+        function showForgotPassword() {
+            db.collection('settings').doc('config').get().then(doc => {
+                let contact = '+20 100 000 0000';
+                if (doc.exists && doc.data().contactNumber) {
+                    contact = '+20 ' + doc.data().contactNumber;
+                }
+                $('forgotContactDisplay').textContent = contact;
+                showView('viewForgotPassword');
+            }).catch(() => {
+                $('forgotContactDisplay').textContent = '+20 100 000 0000';
+                showView('viewForgotPassword');
+            });
+        }
+
+        // ================================================================
+        //  CUSTOMER LOGIN / SIGNUP TOGGLE
+        // ================================================================
+        function setCustomerLoginMode(isSignup) {
+            isNewCustomer = isSignup;
+            if (isSignup) {
+                $('customerLoginTitle').textContent = 'إنشاء حساب جديد';
+                $('customerLoginSub').textContent = 'أدخل بياناتك للتسجيل';
+                $('customerNameGroup').style.display = 'block';
+                $('customerConfirmGroup').style.display = 'block';
+                $('btnCustomerLoginText').textContent = 'إنشاء حساب';
+                $('toggleLoginSignupText').textContent = 'لديك حساب بالفعل؟';
+                $('toggleLoginSignupBtn').textContent = 'تسجيل الدخول';
+                $('forgotPasswordLink').style.display = 'none';
+            } else {
+                $('customerLoginTitle').textContent = 'تسجيل الدخول';
+                $('customerLoginSub').textContent = 'أدخل رقم هاتفك والرقم السري';
+                $('customerNameGroup').style.display = 'none';
+                $('customerConfirmGroup').style.display = 'none';
+                $('btnCustomerLoginText').textContent = 'تسجيل الدخول';
+                $('toggleLoginSignupText').textContent = 'ليس لديك حساب؟';
+                $('toggleLoginSignupBtn').textContent = 'إنشاء حساب جديد';
+                $('forgotPasswordLink').style.display = 'block';
+            }
+            $('customerPassword').value = '';
+            $('customerConfirmPassword').value = '';
+        }
+
+        function toggleCustomerLoginMode() {
+            setCustomerLoginMode(!isNewCustomer);
+        }
+
+        // ================================================================
+        //  HANDLE CUSTOMER LOGIN / SIGNUP
+        // ================================================================
+        async function handleCustomerLogin() {
+            const phoneRaw = $('customerPhone').value.trim().replace(/\D/g, '');
+            if (!isValidEgyptianMobile(phoneRaw)) {
+                showToast('الرجاء إدخال رقم هاتف مصري صحيح (10 أرقام تبدأ بـ 1)', 'warning');
+                return;
+            }
+            const phone = getFullPhone(phoneRaw);
+            const password = $('customerPassword').value;
+            if (!password || password.length < 4) {
+                showToast('الرقم السري يجب أن يكون 4 أحرف على الأقل', 'warning');
+                return;
+            }
+
+            const btn = $('btnCustomerLogin');
+            const originalLabel = isNewCustomer ? 'إنشاء حساب' : 'تسجيل الدخول';
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner"></span> جاري...';
+
+            const resetBtn = () => {
+                btn.disabled = false;
+                btn.innerHTML = `<span id="btnCustomerLoginText">${originalLabel}</span>`;
+            };
+
+            try {
+                if (!db) throw new Error('Firebase غير مهيأ بشكل صحيح');
+
+                const userSnap = await db.collection('users').where('phone', '==', phone).limit(1).get();
+
+                if (isNewCustomer) {
+                    if (!userSnap.empty) {
+                        showToast('هذا الرقم مسجل بالفعل، الرجاء تسجيل الدخول', 'error');
+                        resetBtn();
+                        return;
+                    }
+                    const name = $('customerName').value.trim();
+                    if (!name || name.length < 2) {
+                        showToast('الرجاء إدخال الاسم الكامل', 'warning');
+                        resetBtn();
+                        return;
+                    }
+                    const confirmPass = $('customerConfirmPassword').value;
+                    if (password !== confirmPass) {
+                        showToast('الرقم السري غير متطابق مع التأكيد', 'error');
+                        resetBtn();
+                        return;
+                    }
+                    const salt = generateSalt();
+                    const hashedPassword = await hashPassword(password, salt);
+                    await db.collection('users').add({
+                        phone, name, password: hashedPassword, salt,
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    });
+                    showToast('تم إنشاء الحساب بنجاح ✅', 'success');
+                    currentUser = { phone, name };
+                    enterCustomerDashboard();
+                } else {
+                    if (userSnap.empty) {
+                        showToast('لا يوجد حساب بهذا الرقم، الرجاء إنشاء حساب جديد', 'error');
+                        resetBtn();
+                        return;
+                    }
+                    const userDoc = userSnap.docs[0];
+                    const userData = userDoc.data();
+                    let match = false;
+
+                    if (userData.salt) {
+                        const hashed = await hashPassword(password, userData.salt);
+                        match = hashed === userData.password;
+                    } else {
+                        match = userData.password === password;
+                        if (match) {
+                            const newSalt = generateSalt();
+                            const newHash = await hashPassword(password, newSalt);
+                            await db.collection('users').doc(userDoc.id).update({ password: newHash, salt: newSalt });
+                        }
+                    }
+
+                    if (!match) {
+                        showToast('الرقم السري غير صحيح', 'error');
+                        resetBtn();
+                        return;
+                    }
+                    currentUser = { phone, name: userData.name };
+                    showToast('مرحباً ' + currentUser.name + ' 👋', 'success');
+                    enterCustomerDashboard();
+                }
+            } catch (err) {
+                console.error('🔥 خطأ:', err);
+                let msg = 'حدث خطأ: ';
+                if (err.message && err.message.includes('permission')) {
+                    msg += 'الرجاء التحقق من قواعد الأمان في Firebase';
+                } else if (err.message && err.message.includes('network')) {
+                    msg += 'تحقق من اتصال الإنترنت';
+                } else {
+                    msg += (err.message || 'يرجى المحاولة مرة أخرى');
+                }
+                showToast(msg, 'error', 6000);
+                resetBtn();
+            }
+        }
+
+        function getFullPhone(number) {
+            const clean = number.replace(/\D/g, '');
+            if (clean.startsWith('0')) return '+20' + clean.slice(1);
+            if (clean.startsWith('20')) return '+' + clean;
+            return '+20' + clean;
+        }
+
+        function enterCustomerDashboard() {
+            showView('viewCustomerDashboard');
+            $('btnLogout').style.display = 'inline-flex';
+            $('customerNameDisplay').textContent = '👤 ' + currentUser.name;
+            $('customerPhoneDisplay').textContent = '📱 ' + currentUser.phone;
+            $('bookingName').value = currentUser.name;
+            loadSettings().then(() => {
+                renderDayPicker('bookingDayPicker', (dateStr) => { selectedBookingDate = dateStr; });
+            });
+        }
+
+        // ================================================================
+        //  LOAD SETTINGS (public config only)
+        // ================================================================
+        async function loadSettings() {
+            try {
+                const doc = await db.collection('settings').doc('config').get();
+                if (doc.exists) {
+                    const data = doc.data();
+                    const allowTime = data.allowTimeSelection !== false;
+                    const dailyLimit = data.dailyLimit || 10;
+                    const closedWeekdays = Array.isArray(data.closedWeekdays) ? data.closedWeekdays : [];
+                    window._settings = { allowTime, dailyLimit, contactNumber: data.contactNumber || '', closedWeekdays };
+                    updateTimeUI(allowTime);
+                } else {
+                    window._settings = { allowTime: true, dailyLimit: 10, contactNumber: '', closedWeekdays: [] };
+                    updateTimeUI(true);
+                }
+            } catch (err) {
+                console.error('Error loading settings:', err);
+                window._settings = { allowTime: true, dailyLimit: 10, contactNumber: '', closedWeekdays: [] };
+            }
+        }
+
+        function updateTimeUI(allowTime) {
+            const timeGroup = $('timeGroup');
+            const timeHint = $('timeHint');
+            if (timeGroup) {
+                if (allowTime) {
+                    timeGroup.style.display = 'block';
+                    timeHint.textContent = '(اختياري)';
+                } else {
+                    timeGroup.style.display = 'none';
+                    timeHint.textContent = '(غير مفعل)';
+                }
+            }
+            const adminTimeGroup = $('adminTimeGroup');
+            if (adminTimeGroup) adminTimeGroup.style.display = allowTime ? 'block' : 'none';
+        }
+
+        // ================================================================
+        //  DAY PICKER RENDERING
+        // ================================================================
+        async function renderDayPicker(containerId, onSelect) {
+            const container = $(containerId);
+            if (!container) return;
+            container.innerHTML = '<span class="text-muted" style="font-size:13px;">جارِ تحميل الأيام...</span>';
+            const closedWeekdays = window._settings?.closedWeekdays || [];
+            const limit = window._settings?.dailyLimit || 10;
+            const days = getNextWeekDates();
+            let counts;
+            try {
+                counts = await Promise.all(days.map(d => getTodayBookingsCount(d.dateStr)));
+            } catch {
+                counts = days.map(() => 0);
+            }
+            container.innerHTML = '';
+            let autoSelected = null;
+            days.forEach((d, i) => {
+                const isClosed = closedWeekdays.includes(d.weekdayIndex);
+                const isFull = counts[i] >= limit;
+                const disabled = isClosed || isFull;
+                const chip = document.createElement('button');
+                chip.type = 'button';
+                chip.className = 'day-chip' + (disabled ? ' disabled' : '');
+                chip.innerHTML = `<span class="day-chip-weekday">${d.weekdayLabel}</span><span class="day-chip-num">${d.dayNum}</span>`;
+                if (disabled) {
+                    chip.disabled = true;
+                    chip.title = isClosed ? 'يوم مغلق' : 'اكتمل الحجز لهذا اليوم';
+                } else {
+                    chip.onclick = () => {
+                        container.querySelectorAll('.day-chip').forEach(c => c.classList.remove('selected'));
+                        chip.classList.add('selected');
+                        onSelect(d.dateStr);
+                    };
+                    if (autoSelected === null) autoSelected = { chip, dateStr: d.dateStr };
+                }
+                container.appendChild(chip);
+            });
+            if (autoSelected) {
+                autoSelected.chip.classList.add('selected');
+                onSelect(autoSelected.dateStr);
+            } else {
+                onSelect(null);
+                container.insertAdjacentHTML('beforeend', '<span class="text-muted" style="font-size:13px;">لا توجد أيام متاحة هذا الأسبوع</span>');
+            }
+        }
+
+        // ================================================================
+        //  BOOKING LIMIT — atomic counter
+        // ================================================================
+        function counterRef(date) {
+            return db.collection('counters').doc(date);
+        }
+
+        async function bookWithLimit(bookingData, limit) {
+            const cRef = counterRef(bookingData.date);
+            const bookingRef = db.collection('bookings').doc();
+            await db.runTransaction(async (t) => {
+                const counterDoc = await t.get(cRef);
+                const count = counterDoc.exists ? (counterDoc.data().count || 0) : 0;
+                if (count >= limit) throw new Error('DAILY_LIMIT_REACHED');
+                t.set(cRef, { count: count + 1, date: bookingData.date }, { merge: true });
+                t.set(bookingRef, bookingData);
+            });
+            return bookingRef.id;
+        }
+
+        async function decrementCounter(date) {
+            if (!date) return;
+            const cRef = counterRef(date);
+            try {
+                await db.runTransaction(async (t) => {
+                    const counterDoc = await t.get(cRef);
+                    const count = counterDoc.exists ? (counterDoc.data().count || 0) : 0;
+                    t.set(cRef, { count: Math.max(0, count - 1), date }, { merge: true });
+                });
+            } catch (err) {
+                console.error('decrementCounter failed:', err);
+            }
+        }
+
+        async function getTodayBookingsCount(date) {
+            try {
+                const doc = await counterRef(date).get();
+                if (doc.exists) return doc.data().count || 0;
+                const snap = await db.collection('bookings')
+                    .where('date', '==', date).where('status', '==', 'active').get();
+                return snap.size;
+            } catch {
+                return 0;
+            }
+        }
+
+        // ================================================================
+        //  SUBMIT BOOKING
+        // ================================================================
+        async function submitBooking() {
+            if (!currentUser) {
+                showToast('الرجاء تسجيل الدخول أولاً', 'error');
+                return;
+            }
+            if (!selectedBookingDate) {
+                showToast('الرجاء اختيار يوم للحجز', 'warning');
+                return;
+            }
+            const date = selectedBookingDate;
+            const limit = window._settings?.dailyLimit || 10;
+            const name = ($('bookingName').value.trim() || currentUser.name).slice(0, 60);
+            const time = $('bookingTime').value || '';
+            const altPhoneRaw = $('bookingAltPhone').value.trim().replace(/\D/g, '');
+            if (altPhoneRaw && !isValidEgyptianMobile(altPhoneRaw)) {
+                showToast('رقم الهاتف الإضافي غير صحيح', 'warning');
+                return;
+            }
+            const notes = $('bookingNotes').value.trim().slice(0, 300);
+
+            const data = {
+                userId: currentUser.phone, userName: name, phone: currentUser.phone,
+                alternativePhone: altPhoneRaw ? getFullPhone(altPhoneRaw) : '',
+                date, time, notes, status: 'active',
+                createdAt: firebase.firestore.FieldValue.serverTimestamp(), bookedByAdmin: false,
+            };
+
+            const submitBtn = $('btnSubmitBooking');
+            submitBtn.disabled = true;
+            try {
+                await bookWithLimit(data, limit);
+                showToast(`تم الحجز بنجاح ✅ (${formatDateLabel(date)})`, 'success');
+                $('bookingTime').value = '';
+                $('bookingAltPhone').value = '';
+                $('bookingNotes').value = '';
+                renderDayPicker('bookingDayPicker', (d) => { selectedBookingDate = d; });
+                if (document.getElementById('adminOverlay').classList.contains('show')) {
+                    refreshAdminBookings();
+                }
+            } catch (err) {
+                console.error(err);
+                if (err.message === 'DAILY_LIMIT_REACHED') {
+                    showToast(`عذراً، تم الوصول للحد الأقصى للحجوزات في هذا اليوم (${limit})`, 'error');
+                    renderDayPicker('bookingDayPicker', (d) => { selectedBookingDate = d; });
+                } else {
+                    showToast('فشل الحجز: ' + (err.message || ''), 'error');
+                }
+            } finally {
+                submitBtn.disabled = false;
+            }
+        }
+
+        // ================================================================
+        //  VIEW MY BOOKINGS
+        // ================================================================
+        async function viewMyBookings() {
+            const container = $('myBookingsContainer');
+            const list = $('myBookingsList');
+            container.style.display = 'block';
+            if (!currentUser) {
+                list.innerHTML = '<div class="empty-state"><p>الرجاء تسجيل الدخول</p></div>';
+                return;
+            }
+            try {
+                const snap = await db.collection('bookings')
+                    .where('phone', '==', currentUser.phone)
+                    .where('status', '==', 'active')
+                    .orderBy('date', 'asc')
+                    .get();
+                if (snap.empty) {
+                    list.innerHTML = `<div class="empty-state"><div class="emoji">📭</div><h3>لا توجد حجوزات</h3><p>ليس لديك أي حجوزات نشطة حالياً</p></div>`;
+                    return;
+                }
+                list.innerHTML = '';
+                snap.forEach(doc => {
+                    const b = doc.data();
+                    const id = doc.id;
+                    const card = document.createElement('div');
+                    card.className = 'booking-card';
+                    card.innerHTML = `
+                        <div class="top-row">
+                            <span class="customer-name">${escapeHtml(b.userName)}</span>
+                            <span class="booking-date">📅 ${escapeHtml(b.date)}</span>
+                        </div>
+                        ${b.time ? `<div class="booking-time">🕐 ${escapeHtml(b.time)}</div>` : ''}
+                        <div class="booking-phone">📱 ${escapeHtml(b.phone)}</div>
+                        ${b.notes ? `<div class="booking-notes">📝 ${escapeHtml(b.notes)}</div>` : ''}
+                        <div class="actions">
+                            <button class="btn btn-danger btn-sm">❌ إلغاء</button>
+                        </div>
+                    `;
+                    card.querySelector('.btn-danger').addEventListener('click', () => cancelBooking(id, b.date));
+                    list.appendChild(card);
+                });
+            } catch (err) {
+                console.error(err);
+                list.innerHTML = '<div class="empty-state"><p>خطأ في تحميل الحجوزات</p></div>';
+            }
+        }
+
+        function closeMyBookings() {
+            $('myBookingsContainer').style.display = 'none';
+        }
+
+        async function cancelBooking(bookingId, date) {
+            if (!confirm('هل أنت متأكد من إلغاء هذا الحجز؟')) return;
+            try {
+                await db.collection('bookings').doc(bookingId).update({
+                    status: 'cancelled',
+                    cancelledAt: firebase.firestore.FieldValue.serverTimestamp(),
+                });
+                await decrementCounter(date);
+                showToast('تم إلغاء الحجز بنجاح ❌', 'success');
+                viewMyBookings();
+                renderDayPicker('bookingDayPicker', (d) => { selectedBookingDate = d; });
+                if (document.getElementById('adminOverlay').classList.contains('show')) {
+                    refreshAdminBookings();
+                }
+            } catch (err) {
+                console.error(err);
+                showToast('فشل الإلغاء', 'error');
+            }
+        }
+
+        // ================================================================
+        //  ADMIN OVERLAY — Trigger
+        // ================================================================
+        document.getElementById('appTitle').addEventListener('click', function() {
+            adminClicks++;
+            if (adminClickTimer) clearTimeout(adminClickTimer);
+            adminClickTimer = setTimeout(() => { adminClicks = 0; }, 500);
+            if (adminClicks >= 5) {
+                adminClicks = 0;
+                clearTimeout(adminClickTimer);
+                const entered = prompt('أدخل كلمة سر الأدمن:');
+                if (entered === null) return;
+                checkAdminPassword(entered).then(ok => {
+                    if (ok) openAdminPanel();
+                    else showToast('كلمة سر غير صحيحة', 'error');
+                });
+            }
+        });
+
+        async function checkAdminPassword(entered) {
+            try {
+                const doc = await db.collection('settings').doc('adminAuth').get();
+                let hash;
+                if (doc.exists && doc.data().passwordHash) {
+                    hash = doc.data().passwordHash;
+                } else {
+                    hash = await hashPassword(DEFAULT_ADMIN_PASSWORD, ADMIN_SALT);
+                }
+                const enteredHash = await hashPassword(entered, ADMIN_SALT);
+                return enteredHash === hash;
+            } catch (err) {
+                console.error('checkAdminPassword failed:', err);
+                return false;
+            }
+        }
+
+        function openAdminPanel() {
+            document.getElementById('adminOverlay').classList.add('show');
+            loadAdminDashboard();
+        }
+
+        function closeAdminPanel() {
+            document.getElementById('adminOverlay').classList.remove('show');
+        }
+
+        // ================================================================
+        //  ADMIN DASHBOARD
+        // ================================================================
+        async function loadAdminDashboard() {
+            await loadSettings();
+            populateAdminDateSelect();
+            renderClosedWeekdaysPicker();
+            renderDayPicker('adminBookingDayPicker', (d) => { selectedAdminBookingDate = d; });
+            $('settingDailyLimit').value = window._settings?.dailyLimit || 10;
+            const toggle = $('toggleTime');
+            if (window._settings?.allowTime) toggle.classList.add('active'); else toggle.classList.remove('active');
+            $('settingContactNumber').value = window._settings?.contactNumber || '';
+            $('settingAdminPassword').value = '';
+            await refreshAdminBookings();
+            await refreshUsersList();
+            await updateStats();
+        }
+
+        function populateAdminDateSelect() {
+            const select = $('adminBookingDateSelect');
+            const days = getNextWeekDates();
+            select.innerHTML = '';
+            days.forEach(d => {
+                const opt = document.createElement('option');
+                opt.value = d.dateStr;
+                opt.textContent = `${WEEKDAY_LABELS[d.weekdayIndex]} - ${d.dateStr}`;
+                select.appendChild(opt);
+            });
+            adminSelectedViewDate = days[0].dateStr;
+            select.value = adminSelectedViewDate;
+        }
+
+        function onAdminDateSelectChange() {
+            adminSelectedViewDate = $('adminBookingDateSelect').value;
+            refreshAdminBookings();
+            updateStats();
+        }
+
+        function renderClosedWeekdaysPicker() {
+            closedWeekdaysDraft = [...(window._settings?.closedWeekdays || [])];
+            const container = $('closedWeekdaysPicker');
+            container.innerHTML = '';
+            WEEKDAY_LABELS.forEach((label, idx) => {
+                const chip = document.createElement('button');
+                chip.type = 'button';
+                chip.className = 'weekday-chip' + (closedWeekdaysDraft.includes(idx) ? ' active' : '');
+                chip.textContent = label;
+                chip.onclick = () => {
+                    const pos = closedWeekdaysDraft.indexOf(idx);
+                    if (pos >= 0) { closedWeekdaysDraft.splice(pos, 1); chip.classList.remove('active'); }
+                    else { closedWeekdaysDraft.push(idx); chip.classList.add('active'); }
+                };
+                container.appendChild(chip);
+            });
+        }
+
+        async function refreshAdminBookings() {
+            const date = adminSelectedViewDate || getNextWeekDates()[0].dateStr;
+            const list = $('adminBookingsList');
+            try {
+                const snap = await db.collection('bookings')
+                    .where('date', '==', date)
+                    .orderBy('createdAt', 'desc')
+                    .get();
+                if (snap.empty) {
+                    list.innerHTML = `<div class="empty-state"><div class="emoji">📭</div><h3>لا توجد حجوزات</h3><p>لا يوجد أي حجوزات لهذا اليوم</p></div>`;
+                    return;
+                }
+                list.innerHTML = '';
+                snap.forEach(doc => {
+                    const b = doc.data();
+                    const id = doc.id;
+                    const statusBadge = b.status === 'active' ? '🟢 نشط' : b.status === 'cancelled' ? '🔴 ملغي' : '🔵 مكتمل';
+                    const statusClass = b.status === 'active' ? 'active' : b.status === 'cancelled' ? 'cancelled' : 'completed';
+                    const card = document.createElement('div');
+                    card.className = 'booking-card';
+                    card.innerHTML = `
+                        <div class="top-row">
+                            <span class="customer-name">👤 ${escapeHtml(b.userName)}</span>
+                            <span class="badge ${statusClass}">${statusBadge}</span>
+                        </div>
+                        <div style="display:flex; gap:12px; flex-wrap:wrap; margin-top:4px;">
+                            ${b.time ? `<span class="booking-time">🕐 ${escapeHtml(b.time)}</span>` : ''}
+                            <span class="booking-phone">📱 ${escapeHtml(b.phone)}</span>
+                        </div>
+                        ${b.alternativePhone ? `<div class="booking-phone">📞 إضافي: ${escapeHtml(b.alternativePhone)}</div>` : ''}
+                        ${b.notes ? `<div class="booking-notes">📝 ${escapeHtml(b.notes)}</div>` : ''}
+                        ${b.bookedByAdmin ? '<div style="font-size:11px; color:#c89a7b; margin-top:4px;">📌 تم الحجز بواسطة الأدمن</div>' : ''}
+                        <div class="actions"></div>
+                    `;
+                    const actions = card.querySelector('.actions');
+                    if (b.status === 'active') {
+                        const cancelBtn = document.createElement('button');
+                        cancelBtn.className = 'btn btn-danger btn-sm';
+                        cancelBtn.textContent = '❌ إلغاء';
+                        cancelBtn.onclick = () => adminCancelBooking(id, b.date);
+                        const completeBtn = document.createElement('button');
+                        completeBtn.className = 'btn btn-success btn-sm';
+                        completeBtn.textContent = '✅ إكمال';
+                        completeBtn.onclick = () => adminCompleteBooking(id);
+                        actions.appendChild(cancelBtn);
+                        actions.appendChild(completeBtn);
+                    }
+                    list.appendChild(card);
+                });
+            } catch (err) {
+                console.error(err);
+                list.innerHTML = '<div class="empty-state"><p>خطأ في تحميل الحجوزات</p></div>';
+            }
+        }
+
+        async function refreshUsersList() {
+            const tbody = $('usersTableBody');
+            try {
+                const snap = await db.collection('users').orderBy('createdAt', 'desc').get();
+                if (snap.empty) {
+                    tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">لا يوجد عملاء</td></tr>';
+                    return;
+                }
+                tbody.innerHTML = '';
+                let i = 1;
+                snap.forEach(doc => {
+                    const u = doc.data();
+                    const tr = document.createElement('tr');
+                    const nameTd = document.createElement('td');
+                    nameTd.textContent = u.name || 'غير معروف';
+                    const phoneTd = document.createElement('td');
+                    phoneTd.className = 'phone-col';
+                    phoneTd.dir = 'ltr';
+                    phoneTd.textContent = u.phone;
+                    const numTd = document.createElement('td');
+                    numTd.textContent = i++;
+                    const actionsTd = document.createElement('td');
+                    const resetBtn = document.createElement('button');
+                    resetBtn.className = 'btn btn-outline btn-sm';
+                    resetBtn.style.cssText = 'padding:6px 10px; font-size:12px; width:auto;';
+                    resetBtn.textContent = '🔑 إعادة تعيين';
+                    resetBtn.onclick = () => startPasswordReset(doc.id, actionsTd);
+                    actionsTd.appendChild(resetBtn);
+
+                    tr.appendChild(numTd);
+                    tr.appendChild(nameTd);
+                    tr.appendChild(phoneTd);
+                    tr.appendChild(actionsTd);
+                    tbody.appendChild(tr);
+                });
+            } catch (err) {
+                console.error(err);
+                tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">خطأ في التحميل</td></tr>';
+            }
+        }
+
+        function startPasswordReset(userId, cell) {
+            cell.innerHTML = '';
+            const wrap = document.createElement('div');
+            wrap.className = 'inline-reset';
+            const input = document.createElement('input');
+            input.type = 'password';
+            input.placeholder = 'كلمة سر جديدة';
+            const saveBtn = document.createElement('button');
+            saveBtn.className = 'btn btn-success';
+            saveBtn.textContent = '✔️';
+            const cancelBtn = document.createElement('button');
+            cancelBtn.className = 'btn btn-outline';
+            cancelBtn.textContent = '✕';
+
+            saveBtn.onclick = async () => {
+                const newPass = input.value;
+                if (!newPass || newPass.length < 4) {
+                    showToast('كلمة السر قصيرة جداً (4 أحرف على الأقل)', 'warning');
+                    return;
+                }
+                saveBtn.disabled = true;
+                try {
+                    const salt = generateSalt();
+                    const hash = await hashPassword(newPass, salt);
+                    await db.collection('users').doc(userId).update({ password: hash, salt });
+                    showToast('تم تغيير كلمة السر بنجاح ✅', 'success');
+                    refreshUsersList();
+                } catch (err) {
+                    console.error(err);
+                    showToast('فشل تغيير كلمة السر', 'error');
+                    saveBtn.disabled = false;
+                }
+            };
+            cancelBtn.onclick = () => refreshUsersList();
+
+            wrap.appendChild(input);
+            wrap.appendChild(saveBtn);
+            wrap.appendChild(cancelBtn);
+            cell.appendChild(wrap);
+            input.focus();
+        }
+
+        async function updateStats() {
+            const date = adminSelectedViewDate || getNextWeekDates()[0].dateStr;
+            try {
+                const count = await getTodayBookingsCount(date);
+                const limit = window._settings?.dailyLimit || 10;
+                $('statTodayBookings').textContent = count;
+                $('statDailyLimit').textContent = limit;
+                $('statRemaining').textContent = Math.max(0, limit - count);
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        // ================================================================
+        //  ADMIN ACTIONS
+        // ================================================================
+        async function adminCancelBooking(bookingId, date) {
+            if (!confirm('إلغاء هذا الحجز؟')) return;
+            try {
+                await db.collection('bookings').doc(bookingId).update({
+                    status: 'cancelled',
+                    cancelledAt: firebase.firestore.FieldValue.serverTimestamp(),
+                });
+                await decrementCounter(date);
+                showToast('تم إلغاء الحجز', 'success');
+                refreshAdminBookings();
+                updateStats();
+            } catch (err) {
+                showToast('فشل الإلغاء', 'error');
+            }
+        }
+
+        async function adminCompleteBooking(bookingId) {
+            if (!confirm('تأكيد إكمال هذا الحجز؟')) return;
+            try {
+                await db.collection('bookings').doc(bookingId).update({
+                    status: 'completed',
+                    completedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                });
+                showToast('تم إكمال الحجز ✅', 'success');
+                refreshAdminBookings();
+                updateStats();
+            } catch (err) {
+                showToast('فشل التحديث', 'error');
+            }
+        }
+
+        // ================================================================
+        //  ADMIN BOOK FOR CUSTOMER
+        // ================================================================
+        async function adminBookForCustomer() {
+            const phoneRaw = $('adminBookPhone').value.trim().replace(/\D/g, '');
+            if (!isValidEgyptianMobile(phoneRaw)) {
+                showToast('الرجاء إدخال رقم هاتف صحيح للعميل', 'warning');
+                return;
+            }
+            if (!selectedAdminBookingDate) {
+                showToast('الرجاء اختيار يوم للحجز', 'warning');
+                return;
+            }
+            const phone = getFullPhone(phoneRaw);
+            const name = $('adminBookName').value.trim().slice(0, 60);
+            if (!name) {
+                showToast('الرجاء إدخال اسم العميل', 'warning');
+                return;
+            }
+            const date = selectedAdminBookingDate;
+            const limit = window._settings?.dailyLimit || 10;
+            const time = $('adminBookTime').value || '';
+            const altPhoneRaw = $('adminBookAltPhone').value.trim().replace(/\D/g, '');
+            if (altPhoneRaw && !isValidEgyptianMobile(altPhoneRaw)) {
+                showToast('رقم الهاتف الإضافي غير صحيح', 'warning');
+                return;
+            }
+            const notes = $('adminBookNotes').value.trim().slice(0, 300);
+
+            const data = {
+                userId: phone, userName: name, phone,
+                alternativePhone: altPhoneRaw ? getFullPhone(altPhoneRaw) : '',
+                date, time, notes, status: 'active',
+                createdAt: firebase.firestore.FieldValue.serverTimestamp(), bookedByAdmin: true,
+            };
+
+            try {
+                await bookWithLimit(data, limit);
+                showToast(`تم حجز ${name} بنجاح ✅ (${formatDateLabel(date)})`, 'success');
+                $('adminBookName').value = '';
+                $('adminBookPhone').value = '';
+                $('adminBookAltPhone').value = '';
+                $('adminBookNotes').value = '';
+                $('adminBookTime').value = '';
+                renderDayPicker('adminBookingDayPicker', (d) => { selectedAdminBookingDate = d; });
+                refreshAdminBookings();
+                updateStats();
+            } catch (err) {
+                console.error(err);
+                if (err.message === 'DAILY_LIMIT_REACHED') {
+                    showToast(`الحد الأقصى لهذا اليوم (${limit}) تم الوصول إليه`, 'error');
+                    renderDayPicker('adminBookingDayPicker', (d) => { selectedAdminBookingDate = d; });
+                } else {
+                    showToast('فشل الحجز', 'error');
+                }
+            }
+        }
+
+        // ================================================================
+        //  ADMIN SETTINGS
+        // ================================================================
+        function toggleTimeSetting() {
+            $('toggleTime').classList.toggle('active');
+        }
+
+        async function saveSettings() {
+            const limit = Math.max(1, Math.min(100, parseInt($('settingDailyLimit').value) || 10));
+            const allowTime = $('toggleTime').classList.contains('active');
+            const contactNumber = $('settingContactNumber').value.trim().replace(/\D/g, '');
+            const newAdminPass = $('settingAdminPassword').value;
+            const closedWeekdays = [...closedWeekdaysDraft];
+
+            try {
+                await db.collection('settings').doc('config').set({
+                    dailyLimit: limit,
+                    allowTimeSelection: allowTime,
+                    contactNumber: contactNumber,
+                    closedWeekdays: closedWeekdays,
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                }, { merge: true });
+
+                if (newAdminPass) {
+                    if (newAdminPass.length < 4) {
+                        showToast('كلمة سر الأدمن الجديدة قصيرة جداً (4 أحرف على الأقل)', 'warning');
+                    } else {
+                        const newHash = await hashPassword(newAdminPass, ADMIN_SALT);
+                        await db.collection('settings').doc('adminAuth').set({
+                            passwordHash: newHash,
+                            updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                        }, { merge: true });
+                        $('settingAdminPassword').value = '';
+                        showToast('تم تحديث كلمة سر الأدمن ✅', 'success');
+                    }
+                }
+
+                window._settings = { allowTime, dailyLimit: limit, contactNumber, closedWeekdays };
+                updateTimeUI(allowTime);
+                populateAdminDateSelect();
+                renderDayPicker('adminBookingDayPicker', (d) => { selectedAdminBookingDate = d; });
+                showToast('تم حفظ الإعدادات ✅', 'success');
+                refreshAdminBookings();
+                updateStats();
+            } catch (err) {
+                console.error(err);
+                showToast('فشل حفظ الإعدادات', 'error');
+            }
+        }
+
+        // ================================================================
+        //  ADMIN TAB SWITCH
+        // ================================================================
+        function switchAdminTab(tab) {
+            const tabs = ['bookings', 'users', 'settings', 'bookForCustomer'];
+            tabs.forEach(t => {
+                const el = $('adminTab' + t.charAt(0).toUpperCase() + t.slice(1));
+                if (el) el.classList.toggle('active', t === tab);
+                const btn = $('tab' + t.charAt(0).toUpperCase() + t.slice(1) + 'Btn');
+                if (btn) {
+                    btn.className = `btn btn-sm ${t === tab ? 'btn-secondary' : 'btn-outline'}`;
+                    btn.style.flex = '1';
+                }
+            });
+            if (tab === 'settings') {
+                $('settingDailyLimit').value = window._settings?.dailyLimit || 10;
+                const toggle = $('toggleTime');
+                if (window._settings?.allowTime) toggle.classList.add('active'); else toggle.classList.remove('active');
+                $('settingContactNumber').value = window._settings?.contactNumber || '';
+                $('settingAdminPassword').value = '';
+                renderClosedWeekdaysPicker();
+            }
+            if (tab === 'bookForCustomer') {
+                updateTimeUI(window._settings?.allowTime !== false);
+                renderDayPicker('adminBookingDayPicker', (d) => { selectedAdminBookingDate = d; });
+            }
+            if (tab === 'bookings') refreshAdminBookings();
+            if (tab === 'users') refreshUsersList();
+        }
+
+        // ================================================================
+        //  LOGOUT
+        // ================================================================
+        function logout() {
+            currentUser = null;
+            $('btnLogout').style.display = 'none';
+            showCustomerLogin();
+            showToast('تم تسجيل الخروج', 'info');
+            closeAdminPanel();
+        }
+
+        // ================================================================
+        //  INIT
+        // ================================================================
+        window.onload = function() {
+            ['customerPhone', 'bookingAltPhone', 'adminBookPhone', 'adminBookAltPhone', 'settingContactNumber'].forEach(id => {
+                const el = $(id);
+                if (el) {
+                    el.addEventListener('input', function() {
+                        this.value = this.value.replace(/\D/g, '');
+                    });
+                }
+            });
+
+            showCustomerLogin();
+            console.log('✂️ Spaiky — جاهز ✅');
+        };
+    </script>
+</body>
+</html>
